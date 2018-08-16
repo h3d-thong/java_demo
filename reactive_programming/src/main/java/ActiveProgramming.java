@@ -2,11 +2,11 @@ import io.reactivex.Flowable;
 import io.reactivex.Observable;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
+import io.reactivex.schedulers.Schedulers;
 
 public class ActiveProgramming {
     public static void main(String[] args){
+        //một luồng cơ bản, do chưa có API nên dùng một số kiểu nguyên thửy
         Observable<Integer> source = Observable.range(1,5);
 
         Observer<Integer> consumer = new Observer<Integer>() {
@@ -32,6 +32,16 @@ public class ActiveProgramming {
         };
 
         source.subscribe(consumer);
+
+
+        //flatMap thực hiện tiến trình song song và cho ra kết quả không theo thứ tự
+        Flowable.range(1, 10)
+                .flatMap(v ->
+                        Flowable.just(v)
+                                .subscribeOn(Schedulers.computation())
+                                .map(w -> w * w)
+                )
+                .blockingSubscribe(System.out::println);
 
     }
 }

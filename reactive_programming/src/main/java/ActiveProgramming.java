@@ -4,20 +4,27 @@ import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ActiveProgramming {
     public static void main(String[] args){
-        //một luồng cơ bản, do chưa có API nên dùng một số kiểu nguyên thửy
-        Observable<Integer> source = Observable.range(1,5);
+        
+        User user1 = new User("Thong",23,0);
+        User user2 = new User("Nguyen Van A",21,0);
+        User user3 = new User("Tran Van B",28,21000);
 
-        Observer<Integer> consumer = new Observer<Integer>() {
+        Observable<User> source = Observable.just(user1,user2,user3);
+
+        Observer<User> consumer = new Observer<User>() {
             @Override
             public void onSubscribe(Disposable d) {
                 System.out.println(d.toString());
             }
 
             @Override
-            public void onNext(Integer integer) {
-                System.out.println("innit "+integer);
+            public void onNext(User user) {
+                System.out.println("innit "+user.toString());
             }
 
             @Override
@@ -32,16 +39,18 @@ public class ActiveProgramming {
         };
 
         source.subscribe(consumer);
-
+        user1.setName("thongvx");
+        user1.setAge(25);
+        consumer.onNext(user1);
 
         //flatMap thực hiện tiến trình song song và cho ra kết quả không theo thứ tự
-        Flowable.range(1, 10)
+        /*Flowable.range(1, 10)
                 .flatMap(v ->
                         Flowable.just(v)
                                 .subscribeOn(Schedulers.computation())
                                 .map(w -> w * w)
                 )
-                .blockingSubscribe(System.out::println);
+                .blockingSubscribe(System.out::println);*/
 
     }
 }

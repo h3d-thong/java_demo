@@ -38,15 +38,6 @@ public class FluxWithRabbitMQDemo {
 
         reactor.rabbitmq.Sender sender = ReactorRabbitMq.createSender(senderOptions);
 
-        Supplier<String> correlationIdSupplier = () -> UUID.randomUUID().toString();
-        RpcClient rpcClient = sender.rpcClient(
-                "", QUEUE, correlationIdSupplier
-        );
-        Mono<Delivery> reply = rpcClient.rpc(Mono.just(
-                new RpcClient.RpcRequest("hello".getBytes())
-        ));
-        reply.subscribe(System.out::println);
-
 
         //Create Receiver (receive from RabbitMQ)
         Mono<AMQP.Queue.DeclareOk> queueDeclaration = sender.declareQueue(QueueSpecification.queue(QUEUE));

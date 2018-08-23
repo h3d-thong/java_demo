@@ -69,6 +69,7 @@ public class RPCServer {
             channel.basicConsume(RPC_QUEUE_NAME, false, consumer);
             // Wait and be prepared to consume the message from RPC client.
             while (true) {
+
                 synchronized(consumer) {
                     try {
                         consumer.wait();

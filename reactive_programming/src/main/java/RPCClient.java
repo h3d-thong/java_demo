@@ -1,85 +1,59 @@
-import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.AMQP;
-import com.rabbitmq.client.Envelope;
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Delivery;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import reactor.rabbitmq.*;
 
-import java.io.IOException;
+import java.util.Arrays;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 
 public class RPCClient {
 
-    private Connection connection;
-    private Channel channel;
-    private String requestQueueName = "rpc_queue";
+    private static final String QUEUE = "my-queue";
+    public static void main(String[] args){
+        Supplier<String> correlationIdSupplier = () -> UUID.randomUUID().toString();
 
-    public RPCClient() throws IOException, TimeoutException {
-        ConnectionFactory factory = new ConnectionFactory();
-        factory.setHost("localhost");
+        ConnectionFactory connectionFactory = new ConnectionFactory();
+        connectionFactory.useNio();
+        SenderOptions senderOptions =  new SenderOptions()
+                .connectionFactory(connectionFactory)
+                .resourceCreationScheduler(Schedulers.elastic());
 
-        connection = factory.newConnection();
-        channel = connection.createChannel();
-    }
+        Sender sender = ReactorRabbitMq.createSender(senderOptions);
+        RpcClient rpcClient = sender.rpcClient(
+                "", QUEUE, correlationIdSupplier
+        );
 
-    public String call(String message) throws IOException, InterruptedException {
-            final String corrId = UUID.randomUUID().toString();
 
-        String replyQueueName = channel.queueDeclare().getQueue();
-        AMQP.BasicProperties props = new AMQP.BasicProperties
-                .Builder()
-                .correlationId(corrId)
-                .replyTo(replyQueueName)
-                .build();
-
-        channel.basicPublish("", requestQueueName, props, message.getBytes("UTF-8"));
-
-        final BlockingQueue<String> response = new ArrayBlockingQueue<String>(1);
-
-        String ctag = channel.basicConsume(replyQueueName, true, new DefaultConsumer(channel) {
-            @Override
-            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
-                if (properties.getCorrelationId().equals(corrId)) {
-                    response.offer(new String(body, "UTF-8"));
-                }
+        Flux.range(1,10).parallel().runOn(Schedulers.parallel()).doOnNext(i->{
+            String reqs = i+"";
+            String reqs2 = (i+20)+"";
+            //System.out.println("Thread" + Thread.currentThread().getId());
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
-        });
+            Mono<Delivery> respons = rpcClient.rpc(Flux.just(
+                    new RpcClient.RpcRequest(reqs.getBytes()),new RpcClient.RpcRequest(reqs2.getBytes())
+            ));
+            respons.doOnNext(res -> System.out.println("received :"+new String(res.getBody())+"done!")).subscribe();
+        }).subscribe(m-> System.out.println("Sent: message "+m));
 
-        String result = response.take();
-        channel.basicCancel(ctag);
-        return result;
-    }
-
-    public void close() throws IOException {
-        connection.close();
-    }
-
-    public static void main(String[] argv) {
-        RPCClient fibonacciRpc = null;
-        String response = null;
         try {
-            fibonacciRpc = new RPCClient();
-
-            for (int i = 0; i < 32; i++) {
-                String i_str = Integer.toString(i);
-                System.out.println(" [x] Requesting fib(" + i_str + ")");
-                response = fibonacciRpc.call(i_str);
-                System.out.println(" [.] Got '" + response + "'");
-            }
-        }
-        catch  (IOException | TimeoutException | InterruptedException e) {
+            Thread.sleep(60000);
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        finally {
-            if (fibonacciRpc!= null) {
-                try {
-                    fibonacciRpc.close();
-                }
-                catch (IOException _ignore) {}
-            }
+    }
+    public static void sleep(){
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 }
